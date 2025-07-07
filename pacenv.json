@@ -1,0 +1,24 @@
+{
+	"syncdbs": {
+		"world": [
+			"https://mirrors.dotsrc.org/artix-linux/repos/world/os/x86_64/"
+		],
+		"system": [
+			"https://mirrors.dotsrc.org/artix-linux/repos/system/os/x86_64/"
+		]
+	},
+	"deps": [
+		"jansson",
+		"pkg-config",
+		"meson",
+		"ninja",
+		"python",
+		"python-tqdm",
+		"gcc",
+		"gcc-libs=15.1.1+r7+gf36ec88aa85a-1",
+		"binutils>=2.28",
+		"libmpc",
+		"zstd",
+		"libisl.so=23-64"
+	]
+}

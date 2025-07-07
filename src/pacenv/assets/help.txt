@@ -1,0 +1,9 @@
+Creates minimal GNU/Linux environment(s) in one or more target DIRECTORY(ies).
+
+Mandatory arguments to long properties are mandatory for short propertys too.
+  -h, --help        display help text and finish execution
+  -c, --config=PATH path to json config file
+  -v, -vv, -vvv...  increase stdout output verbosity
+
+This is an experimental utility and lacks a set of security measures.
+Use it at your own risk!
