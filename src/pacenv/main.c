@@ -8,7 +8,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <stdbool.h>
-#include <pacenv/cfg.h>
 #include <pacenv/glob.h>
 #include <pacenv/util.h>
 #include <json-c/json.h>
@@ -79,7 +78,7 @@ static alpm_handle_t* initialize_alpm(const char* root, alpm_errno_t* err)
 	strcpy(dbpath, root);
 	strcat(dbpath, PACENV_DBPATH);
 
-	if (mkdir_p(dbpath, 0755) == -1)
+	if (pacenv_makedir(dbpath, 0755) == -1)
 	{
 		goto out;
 	}
@@ -108,8 +107,9 @@ static int add_alpm_deps(alpm_handle_t* handle, struct json_object* deps)
 		struct json_object* dep = json_object_array_get_idx(deps, i);
 		if (json_object_get_type(dep) != json_type_string)
 		{
-			fprintf(stderr, "%s: type mismatch for 'deps' in config: "
-				"must be string array\n", g_filename);
+			fprintf(stderr, "%s: "
+				PACENV_TYPE_MISMATCH_STR("deps[%zu]", "config", "string") "\n",
+				g_filename, i);
 			goto out;
 		}
 		const char* depstr = json_object_get_string(dep);
@@ -183,7 +183,7 @@ int main(int argc, char** argv, char** envp)
 					help_txt);
 				return EXIT_SUCCESS;
 			case 'c':
-				if (!(cfg = parse_cfg(optarg)))
+				if (!(cfg = pacenv_jso_parse(optarg)))
 				{
 					return EXIT_FAILURE;
 				}
@@ -193,7 +193,7 @@ int main(int argc, char** argv, char** envp)
 	}
 
 	// I expect this file to be like 'package.json' or something like that.
-	if (!cfg && !(cfg = parse_cfg("pacenv.json")))
+	if (!cfg && !(cfg = pacenv_jso_parse("pacenv.json")))
 	{
 		return EXIT_FAILURE;
 	}
@@ -232,28 +232,30 @@ int main(int argc, char** argv, char** envp)
 	struct json_object* syncdbs = json_object_object_get(cfg, "syncdbs");
 	if (!syncdbs)
 	{
-		fprintf(stderr, "%s: missing required property 'syncdbs' "
-			"in config\n", g_filename);
+		fprintf(stderr, "%s: " PACENV_MISSING_PROP_STR("'syncdbs'", "config")
+			"\n", g_filename);
 		goto out;
 	}
 	if (json_object_get_type(syncdbs) != json_type_object)
 	{
-		fprintf(stderr, "%s: type mismatch for 'syncdbs' in config: "
-			"must be object\n", g_filename);
+		fprintf(stderr, "%s: "
+			PACENV_TYPE_MISMATCH_STR("'syncdbs'", "config", "object") "\n",
+			g_filename);
 		goto out;
 	}
 
 	struct json_object* deps = json_object_object_get(cfg, "deps");
 	if (!deps)
 	{
-		fprintf(stderr, "%s: missing required property 'deps' "
-			"in config\n", g_filename);
+		fprintf(stderr, "%s: " PACENV_MISSING_PROP_STR("'deps'", "config")
+			"\n", g_filename);
 		goto out;
 	}
 	if (json_object_get_type(deps) != json_type_array)
 	{
-		fprintf(stderr, "%s: type mismatch for 'deps' in config: "
-			"must be array\n", g_filename);
+		fprintf(stderr, "%s: "
+			PACENV_TYPE_MISMATCH_STR("'deps'", "config", "array") "\n",
+			g_filename);
 		goto out;
 	}
 
@@ -264,8 +266,9 @@ int main(int argc, char** argv, char** envp)
 		{
 			if (json_object_get_type(syncdb) != json_type_array)
 			{
-				fprintf(stderr, "%s: type mismatch for '%s' in 'syncdbs': "
-					"must be array\n", g_filename, treename);
+				fprintf(stderr, "%s: "
+					PACENV_TYPE_MISMATCH_STR("'%s'", "'syncdbs'", "array")
+					"\n", g_filename, treename);
 				goto out;
 			}
 
@@ -287,8 +290,9 @@ int main(int argc, char** argv, char** envp)
 				server = json_object_array_get_idx(syncdb, i);
 				if (json_object_get_type(server) != json_type_string)
 				{
-					fprintf(stderr, "%s: type mismatch for '%s' in 'syncdbs': "
-						"must be string array\n", g_filename, treename);
+					fprintf(stderr, "%s: "
+						PACENV_TYPE_MISMATCH_STR("%s[%zu]", "'syncdbs'",
+							"string") "\n", g_filename, treename, i);
 					goto out;
 				}
 

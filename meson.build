@@ -12,7 +12,6 @@ project('pacenv', 'c', default_options : ['c_std=c23'], license : 'MIT',
 # Create new executable to run the utility compilation.
 executable('pacenv',
   [
-    'src/pacenv/cfg.c',
     'src/pacenv/glob.c',
     'src/pacenv/main.c',
     'src/pacenv/util.c'
