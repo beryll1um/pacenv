@@ -33,14 +33,13 @@ struct json_object* parse_cfg(const char* path)
 	{
 		// Thanks JSON-C developers for the newline they are adding
 		// to the end of each error.
-		const char* err = json_util_get_last_err();
 		fprintf(stderr, "%s: " FAILED_TO_ACTION_CONFIG_FILE("parse")
-			": %s: %.*s\n", g_filename, path, (int)(strlen(err) - 1), err);
+			": %s: %s", g_filename, path, json_util_get_last_err());
 		return NULL;
 	}
 	if (json_object_get_type(jso) != json_type_object)
 	{
-		fprintf(stderr, "%s: mismatch of config type: %s: must be 'object'\n",
+		fprintf(stderr, "%s: type mismatch of config: %s: must be object\n",
 			g_filename, path);
 		json_object_put(jso);
 		return NULL;
