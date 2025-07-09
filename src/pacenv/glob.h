@@ -7,7 +7,7 @@
 // Must contain argv[0] pointing to the executable file name string.
 extern const char* g_filename;
 
-// Should describe current execution verbosity state (either 0 or 1).
+// Should describe current execution verbosity level.
 extern int g_verbose;
 
 // vim: set ts=4 sw=4 noexpandtab:
