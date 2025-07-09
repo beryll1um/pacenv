@@ -90,6 +90,80 @@ out:
 	return handle;
 }
 
+static int add_alpm_deps(alpm_handle_t* handle, struct json_object* deps)
+{
+	if (alpm_trans_init(handle, ALPM_TRANS_FLAG_NODEPS) == -1)
+	{
+		fprintf(stderr, "%s: failed to initialize transaction: %s\n",
+			g_filename, alpm_strerror(alpm_errno(handle)));
+		return -1;
+	}
+
+	int ret = -1;
+	// External list of the ALPM depmissing objects.
+	alpm_list_t* data = NULL;
+
+	for (size_t i = 0; i < json_object_array_length(deps); i++)
+	{
+		struct json_object* dep = json_object_array_get_idx(deps, i);
+		if (json_object_get_type(dep) != json_type_string)
+		{
+			fprintf(stderr, "%s: type mismatch for 'deps' in config: "
+				"must be string array\n", g_filename);
+			goto out;
+		}
+		const char* depstr = json_object_get_string(dep);
+
+		alpm_pkg_t* pkg = alpm_find_dbs_satisfier(handle,
+			alpm_get_syncdbs(handle), depstr);
+		if (!pkg)
+		{
+			fprintf(stderr, "%s: failed to resolve dependency "
+				"satisfaction: %s: %s\n", g_filename, depstr,
+				alpm_strerror(alpm_errno(handle)));
+			goto out;
+		}
+
+		if (g_verbose > 0)
+		{
+			printf("%s: successful resolve of dependency satisfaction: "
+				"%s\n", g_filename, depstr);
+		}
+
+		if (alpm_add_pkg(handle, pkg) == -1)
+		{
+			fprintf(stderr, "%s: failed to add package: %s: %s\n",
+				g_filename, depstr, alpm_strerror(alpm_errno(handle)));
+			goto out;
+		}
+	}
+
+	if (alpm_trans_prepare(handle, &data) == -1)
+	{
+		fprintf(stderr, "%s: failed to prepare transaction: %s\n",
+			g_filename, alpm_strerror(alpm_errno(handle)));
+		goto out;
+	}
+
+	// In the future, it will be crucial to integrate a progress bar.
+	if (alpm_trans_commit(handle, &data) == -1)
+	{
+		fprintf(stderr, "%s: failed to commit transaction: %s\n",
+			g_filename, alpm_strerror(alpm_errno(handle)));
+		goto out;
+	}
+
+	ret = 0;
+out:
+	if (alpm_trans_release(handle) == -1)
+	{
+		fprintf(stderr, "%s: failed to release transaction: %s\n",
+			g_filename, alpm_strerror(alpm_errno(handle)));
+	}
+	alpm_list_free(data);
+	return ret;
+}
+
 int main(int argc, char** argv, char** envp)
 {
 	int ret;
@@ -151,7 +225,7 @@ int main(int argc, char** argv, char** envp)
 		if (g_verbose > 0)
 		{
 			printf("%s: successful initialization of ALPM library -- '%s'\n",
-				g_filename, argv[ind]);
+				g_filename, alpm_option_get_root(handle));
 		}
 	}
 
@@ -233,77 +307,15 @@ int main(int argc, char** argv, char** envp)
 				"%s\n", g_filename, alpm_strerror(alpm_errno(handle)));
 			goto out;
 		}
-
-		if (alpm_trans_init(handle, ALPM_TRANS_FLAG_NODEPS) == -1)
+		if (add_alpm_deps(handle, deps) == -1)
 		{
-			fprintf(stderr, "%s: failed to initialize transaction: %s\n",
-				g_filename, alpm_strerror(alpm_errno(handle)));
 			goto out;
 		}
-
-		// This one should be defined here because of
-		// 'trans_out' label restriction.
-		alpm_list_t* data = NULL;
-
-		for (size_t i = 0; i < json_object_array_length(deps); i++)
+		if (g_verbose > 0)
 		{
-			struct json_object* dep = json_object_array_get_idx(deps, i);
-			if (json_object_get_type(dep) != json_type_string)
-			{
-				fprintf(stderr, "%s: type mismatch for 'deps' in config: "
-					"must be string array\n", g_filename);
-				goto trans_out;
-			}
-			const char* depstr = json_object_get_string(dep);
-
-			alpm_pkg_t* pkg = alpm_find_dbs_satisfier(handle,
-				alpm_get_syncdbs(handle), depstr);
-			if (!pkg)
-			{
-				fprintf(stderr, "%s: failed to resolve dependency "
-					"satisfaction: %s: %s\n", g_filename, depstr,
-					alpm_strerror(alpm_errno(handle)));
-				goto trans_out;
-			}
-
-			if (g_verbose > 0)
-			{
-				printf("%s: successful resolve of dependency satisfaction -- "
-					"'%s'\n", g_filename, depstr);
-			}
-
-			if (alpm_add_pkg(handle, pkg) == -1)
-			{
-				fprintf(stderr, "%s: failed to add package: %s: %s\n",
-					g_filename, depstr, alpm_strerror(alpm_errno(handle)));
-				goto trans_out;
-			}
+			printf("%s: successful installation of ALPM dependencies -- "
+				"'%s'\n", g_filename, alpm_option_get_root(handle));
 		}
-
-		if (alpm_trans_prepare(handle, &data) == -1)
-		{
-			fprintf(stderr, "%s: failed to prepare transaction: %s\n",
-				g_filename, alpm_strerror(alpm_errno(handle)));
-			goto trans_out;
-		}
-
-		// In the future, it will be crucial to integrate a progress bar.
-		if (alpm_trans_commit(handle, &data) == -1)
-		{
-			fprintf(stderr, "%s: failed to commit transaction: %s\n",
-				g_filename, alpm_strerror(alpm_errno(handle)));
-			goto trans_out;
-		}
-
-// In case we fail to achieve transaction commit, we will still continue
-// processing other handles.
-trans_out:
-		if (alpm_trans_release(handle) == -1)
-		{
-			fprintf(stderr, "%s: failed to release transaction: %s\n",
-				g_filename, alpm_strerror(alpm_errno(handle)));
-		}
-		alpm_list_free(data);
 	}
 	ret = EXIT_SUCCESS;
 out:
