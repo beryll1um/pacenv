@@ -1,4 +1,5 @@
 {
+	"name": "pacenv",
 	"syncdbs": {
 		"world": [
 			"https://mirrors.dotsrc.org/artix-linux/repos/world/os/x86_64/"

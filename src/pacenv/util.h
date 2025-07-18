@@ -18,6 +18,23 @@ struct json_object* pacenv_jso_parse(const char* filepath);
 	"missing property " WHAT " in " WHERE
 
 // This is similar to 'mkdir -p', but looks much better!
-int pacenv_makedir(const char* path, mode_t mode);
+int pacenv_makedir(mode_t mode, const char* path);
+
+// This version of the function accept arbitrary number of arguments:
+// pacenv_makedirl(mode, arg1, arg2, ..., NULL);
+int pacenv_makedirl(mode_t mode, const char* args, ...);
+
+// Helps to calculate number of occurrences of the needle in a haystack.
+size_t pacenv_memocc(const char* start, const char* end, const char* occur,
+	size_t occurlen);
+
+// It implements replacement in a buffer that is already long enough
+// to hold original string and replacement result.
+// Returns pointer to the new end of the buffer.
+char* pacenv_memrep(char* start, char* end, const char* old, size_t oldlen,
+	const char* new, size_t newlen);
+
+// Should I explain why we need this?
+#define MAX(A, B) (A > B ? A : B)
 
 // vim: set ts=4 sw=4 noexpandtab:

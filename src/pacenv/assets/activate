@@ -1,0 +1,13 @@
+if declare -F deactivate_%%NAME%% >/dev/null; then
+	echo "The '%%NAME%%' is already sourced, or it may be name conflict."
+	return
+fi
+
+deactivate_%%NAME%%() {
+	PATH="${PATH//"%%ROOT%%usr/bin:"/}"
+	unset ${FUNCNAME[0]}
+}
+
+PATH="%%ROOT%%usr/bin:$PATH"
+
+# vim: set filetype=bash ts=2 sw=2 noexpandtab:
