@@ -12,6 +12,7 @@ configure environment to use it.
 ```bash
 cat << EOF > figenv.json
 {
+	"name": "figenv",
 	"syncdbs": {
 		"world": [
 			"https://mirrors.dotsrc.org/artix-linux/repos/world/os/x86_64/"
@@ -21,9 +22,10 @@ cat << EOF > figenv.json
 }
 EOF
 pacenv -c figenv.json .figenv
-PATH+=":$PWD/.figenv/usr/bin"
-export FIGLET_FONTDIR=.figenv/usr/share/figlet/fonts/
+source .figenv/usr/local/bin/activate
+export FIGLET_FONTDIR=$PWD/.figenv/usr/share/figlet/fonts/
 figlet pacenv
+deactivate_figenv
 ```
 
 ## Contribution

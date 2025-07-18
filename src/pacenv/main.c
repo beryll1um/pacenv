@@ -2,7 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file LICENSE or https://opensource.org/license/mit/.
 
-#include <errno.h>
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,9 @@
 #include <pacenv/util.h>
 #include <json-c/json.h>
 #include <alpm.h>
+
+// This is used in different places so should be defined.
+#define PACENV_LCBINPATH "/usr/local/bin"
 
 static void release_alpm_cb(void* data)
 {
@@ -39,7 +43,7 @@ static void release_alpm_cb(void* data)
 	free(root);
 }
 
-static void log_alpm_cb(void* ctx, alpm_loglevel_t level, const char* fmt,
+static void log_alpm_cb(void*, alpm_loglevel_t, const char* fmt,
 	va_list args)
 {
 	// There is currently no multithreading, but if it is implemented,
@@ -48,18 +52,6 @@ static void log_alpm_cb(void* ctx, alpm_loglevel_t level, const char* fmt,
 	printf("%s: libalpm: ", g_filename);
 	vprintf(fmt, args);
 }
-
-static struct option long_opts[] =
-{
-	{ "help", no_argument, NULL, 'h' },
-	{ "config", required_argument, NULL, 'c' },
-	{ NULL, 0, NULL, 0 }
-};
-
-static char help_txt[] = {
-// Thanks to the C23 standard we can use this beautiful macro.
-#embed "assets/help.txt" suffix(, 0)
-};
 
 // This must be a constant since the database is unique for each environment.
 #define PACENV_DBPATH "/var/lib/pacenv"
@@ -78,7 +70,7 @@ static alpm_handle_t* initialize_alpm(const char* root, alpm_errno_t* err)
 	strcpy(dbpath, root);
 	strcat(dbpath, PACENV_DBPATH);
 
-	if (pacenv_makedir(dbpath, 0755) == -1)
+	if (pacenv_makedir(0755, dbpath) == -1)
 	{
 		goto out;
 	}
@@ -164,7 +156,88 @@ out:
 	return ret;
 }
 
-int main(int argc, char** argv, char** envp)
+static char activate[] = {
+#embed "assets/activate"
+};
+
+static int write_activate(const char* name, const char* root, const char* dir)
+{
+	// I hope that your compiler is powerful enough to optimize this,
+	// otherwise...
+	size_t buflen = sizeof(activate);
+
+	size_t namelen = strlen(name);
+	static const char name_phldr[] = "%%NAME%%";
+	buflen += pacenv_memocc(activate, activate + sizeof(activate),
+		name_phldr, strlen(name_phldr)) * (namelen - strlen(name_phldr));
+
+	size_t rootlen = strlen(root);
+	static const char root_phldr[] = "%%ROOT%%";
+	buflen += pacenv_memocc(activate, activate + sizeof(activate),
+		root_phldr, strlen(root_phldr)) * (rootlen - strlen(root_phldr));
+
+	// The final buffer must be larger than the initial length to allow
+	// replacement in a single chunk of memory.
+	char* buf = malloc(MAX(sizeof(activate), buflen));
+	if (!buf)
+	{
+		return -1;
+	}
+
+	// The approach requires the presence of the source string in the buffer.
+	mempcpy(buf, activate, sizeof(activate));
+	// Each subsequent replacement must use the a end returned.
+	char* end = pacenv_memrep(buf, buf + sizeof(activate), name_phldr,
+		strlen(name_phldr), name, namelen);
+	// This is the last one, so the end can be omitted.
+	pacenv_memrep(buf, end, root_phldr, strlen(root_phldr),
+		root, rootlen);
+
+	int ret = 0;
+	char* path = malloc(strlen(root) + strlen(dir) + 9 /* /activate */ + 1);
+	if (!path)
+	{
+		ret = -1;
+		goto out;
+	}
+	strcpy(path, root);
+	strcat(path, dir);
+	strcat(path, "/activate");
+
+	FILE* fp = fopen(path, "w");
+	free(path);
+	if (!fp)
+	{
+		ret = -1;
+		goto out;
+	}
+
+	size_t written = fwrite(buf, 1, buflen, fp);
+	if (written != buflen)
+	{
+		fprintf(stderr, "%s: failed to write activation script: "
+			"%s\n", g_filename, strerror(ferror(fp)));
+		ret = -1;
+	}
+
+	fclose(fp);
+out:
+	free(buf);
+	return ret;
+}
+
+static struct option long_opts[] =
+{
+	{ "help", no_argument, NULL, 'h' },
+	{ "config", required_argument, NULL, 'c' },
+	{ NULL, 0, NULL, 0 }
+};
+
+static char help_txt[] = {
+#embed "assets/help.txt" suffix(, 0)
+};
+
+int main(int argc, char** argv)
 {
 	int ret;
 	g_filename = argv[0];
@@ -227,6 +300,21 @@ int main(int argc, char** argv, char** envp)
 			printf("%s: successful initialization of ALPM library -- '%s'\n",
 				g_filename, alpm_option_get_root(handle));
 		}
+	}
+
+	struct json_object* name = json_object_object_get(cfg, "name");
+	if (!name)
+	{
+		fprintf(stderr, "%s: " PACENV_MISSING_PROP_STR("'name'", "config")
+			"\n", g_filename);
+		goto out;
+	}
+	if (json_object_get_type(name) != json_type_string)
+	{
+		fprintf(stderr, "%s: "
+			PACENV_TYPE_MISMATCH_STR("'name'", "config", "string") "\n",
+			g_filename);
+		goto out;
 	}
 
 	struct json_object* syncdbs = json_object_object_get(cfg, "syncdbs");
@@ -312,6 +400,16 @@ int main(int argc, char** argv, char** envp)
 			goto out;
 		}
 		if (add_alpm_deps(handle, deps) == -1)
+		{
+			goto out;
+		}
+		if (pacenv_makedirl(0755, alpm_option_get_root(handle),
+				PACENV_LCBINPATH, NULL) == -1)
+		{
+			goto out;
+		}
+		if (write_activate(json_object_get_string(name),
+				alpm_option_get_root(handle), PACENV_LCBINPATH) == -1)
 		{
 			goto out;
 		}
