@@ -17,6 +17,7 @@ executable('pacenv',
     'src/pacenv/util.c'
   ],
   include_directories : [ 'src/' ],
+  install : true,
   dependencies : [
     # Find external dependencies in the system.
     dependency('json-c', required : true, version : '>=0.18'),
