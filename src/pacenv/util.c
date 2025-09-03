@@ -25,7 +25,7 @@
 
 struct json_object* pacenv_jso_parse(const char* filepath)
 {
-	int fd = open(filepath, O_RDONLY);
+	int fd = open(filepath, O_RDONLY | O_CLOEXEC);
 	if (fd == -1)
 	{
 		fprintf(stderr, "%s: " FAILED_TO_ACTION_FILE_STR("open") ": %s: %s\n",
