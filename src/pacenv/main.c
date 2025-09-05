@@ -15,7 +15,7 @@
 #include <alpm.h>
 
 // This is used in different places so should be defined.
-#define PACENV_LCBINPATH "/usr/local/bin"
+#define PACENV_LCBINPATH "/usr/local/bin/"
 
 static void release_alpm_cb(void* data)
 {
@@ -54,7 +54,7 @@ static void log_alpm_cb(void*, alpm_loglevel_t, const char* fmt,
 }
 
 // This must be a constant since the database is unique for each environment.
-#define PACENV_DBPATH "/var/lib/pacenv"
+#define PACENV_DBPATH "/var/lib/pacenv/"
 
 static alpm_handle_t* initialize_alpm(const char* root, alpm_errno_t* err)
 {
@@ -156,45 +156,40 @@ out:
 	return ret;
 }
 
-static char activate[] = {
-#embed "assets/activate"
-};
-
-static int write_activate(const char* name, const char* root, const char* dir)
+static int write_activate(const char* pattern, size_t patternlen,
+	const char* name, const char* root, const char* dir, const char* filename)
 {
-	// I hope that your compiler is powerful enough to optimize this,
-	// otherwise...
-	size_t buflen = sizeof(activate);
-
-	size_t namelen = strlen(name);
+	size_t buflen = patternlen;
 	static const char name_phldr[] = "%%NAME%%";
-	buflen += pacenv_memocc(activate, activate + sizeof(activate),
+	size_t namelen = strlen(name);
+	static const char root_phldr[] = "%%ROOT%%";
+	size_t rootlen = strlen(root);
+
+	buflen += pacenv_memocc(pattern, pattern + patternlen,
 		name_phldr, strlen(name_phldr)) * (namelen - strlen(name_phldr));
 
-	size_t rootlen = strlen(root);
-	static const char root_phldr[] = "%%ROOT%%";
-	buflen += pacenv_memocc(activate, activate + sizeof(activate),
+	buflen += pacenv_memocc(pattern, pattern + patternlen,
 		root_phldr, strlen(root_phldr)) * (rootlen - strlen(root_phldr));
 
 	// The final buffer must be larger than the initial length to allow
 	// replacement in a single chunk of memory.
-	char* buf = malloc(MAX(sizeof(activate), buflen));
+	char* buf = malloc(MAX(patternlen, buflen));
 	if (!buf)
 	{
 		return -1;
 	}
 
 	// The approach requires the presence of the source string in the buffer.
-	mempcpy(buf, activate, sizeof(activate));
+	mempcpy(buf, pattern, patternlen);
 	// Each subsequent replacement must use the a end returned.
-	char* end = pacenv_memrep(buf, buf + sizeof(activate), name_phldr,
+	char* end = pacenv_memrep(buf, buf + patternlen, name_phldr,
 		strlen(name_phldr), name, namelen);
 	// This is the last one, so the end can be omitted.
 	pacenv_memrep(buf, end, root_phldr, strlen(root_phldr),
 		root, rootlen);
 
 	int ret = 0;
-	char* path = malloc(strlen(root) + strlen(dir) + 9 /* /activate */ + 1);
+	char* path = malloc(strlen(root) + strlen(dir) + strlen(filename) + 1);
 	if (!path)
 	{
 		ret = -1;
@@ -202,7 +197,7 @@ static int write_activate(const char* name, const char* root, const char* dir)
 	}
 	strcpy(path, root);
 	strcat(path, dir);
-	strcat(path, "/activate");
+	strcat(path, filename);
 
 	FILE* fp = fopen(path, "w");
 	free(path);
@@ -235,6 +230,14 @@ static struct option long_opts[] =
 
 static char help_txt[] = {
 #embed "assets/help.txt" suffix(, 0)
+};
+
+static char activate[] = {
+#embed "assets/activate"
+};
+
+static char activate_zsh[] = {
+#embed "assets/activate.zsh"
 };
 
 int main(int argc, char** argv)
@@ -408,8 +411,17 @@ int main(int argc, char** argv)
 		{
 			goto out;
 		}
-		if (write_activate(json_object_get_string(name),
-				alpm_option_get_root(handle), PACENV_LCBINPATH) == -1)
+		// Write an activation script for BASH.
+		if (write_activate(activate, sizeof(activate),
+				json_object_get_string(name), alpm_option_get_root(handle),
+				PACENV_LCBINPATH, "/activate") == -1)
+		{
+			goto out;
+		}
+		// Write an activation script for ZSH.
+		if (write_activate(activate_zsh, sizeof(activate_zsh),
+				json_object_get_string(name), alpm_option_get_root(handle),
+				PACENV_LCBINPATH, "/activate.zsh") == -1)
 		{
 			goto out;
 		}
