@@ -4,10 +4,12 @@ if declare -F deactivate_%%NAME%% >/dev/null; then
 fi
 
 deactivate_%%NAME%%() {
-	PATH="${PATH//"%%ROOT%%usr/bin:"/}"
-	unset ${FUNCNAME[0]}
+	PATH=${PATH//"%%ROOT%%usr/bin:"/}
+	PS1=${PS1//"(%%NAME%%) "/}
+	unset -f ${FUNCNAME[0]}
 }
 
 PATH="%%ROOT%%usr/bin:$PATH"
+PS1="(%%NAME%%) $PS1"
 
 # vim: set filetype=bash ts=2 sw=2 noexpandtab:
