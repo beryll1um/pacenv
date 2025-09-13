@@ -15,7 +15,7 @@
 #include <alpm.h>
 
 // This is used in different places so should be defined.
-#define PACENV_LCBINPATH "/usr/local/bin/"
+#define PACENV_LCBINPATH "/usr/local/bin"
 
 static void release_alpm_cb(void* data)
 {
@@ -54,7 +54,7 @@ static void log_alpm_cb(void*, alpm_loglevel_t, const char* fmt,
 }
 
 // This must be a constant since the database is unique for each environment.
-#define PACENV_DBPATH "/var/lib/pacenv/"
+#define PACENV_DBPATH "/var/lib/pacenv"
 
 static alpm_handle_t* initialize_alpm(const char* root, alpm_errno_t* err)
 {
@@ -157,7 +157,7 @@ out:
 }
 
 static int write_activate(const char* pattern, size_t patternlen,
-	const char* name, const char* root, const char* dir, const char* filename)
+	const char* name, const char* root, const char* filepath)
 {
 	size_t buflen = patternlen;
 	static const char name_phldr[] = "%%NAME%%";
@@ -189,15 +189,14 @@ static int write_activate(const char* pattern, size_t patternlen,
 		root, rootlen);
 
 	int ret = 0;
-	char* path = malloc(strlen(root) + strlen(dir) + strlen(filename) + 1);
+	char* path = malloc(strlen(root) + strlen(filepath) + 1);
 	if (!path)
 	{
 		ret = -1;
 		goto out;
 	}
 	strcpy(path, root);
-	strcat(path, dir);
-	strcat(path, filename);
+	strcat(path, filepath);
 
 	FILE* fp = fopen(path, "w");
 	free(path);
@@ -414,14 +413,14 @@ int main(int argc, char** argv)
 		// Write an activation script for BASH.
 		if (write_activate(activate, sizeof(activate),
 				json_object_get_string(name), alpm_option_get_root(handle),
-				PACENV_LCBINPATH, "/activate") == -1)
+				PACENV_LCBINPATH "/activate") == -1)
 		{
 			goto out;
 		}
 		// Write an activation script for ZSH.
 		if (write_activate(activate_zsh, sizeof(activate_zsh),
 				json_object_get_string(name), alpm_option_get_root(handle),
-				PACENV_LCBINPATH, "/activate.zsh") == -1)
+				PACENV_LCBINPATH "/activate.zsh") == -1)
 		{
 			goto out;
 		}
